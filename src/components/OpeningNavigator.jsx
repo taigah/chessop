@@ -1,81 +1,50 @@
 import React from 'react'
+import { RepertoireWalker } from '../../lib/RepertoireWalker.js'
 import repertoire from '../repertoire.js'
+
+function MoveItem (props) {
+  let className = "mb-4 cursor-pointer"
+  if (props.active) {
+    className += ' font-bold'
+  }
+  return <div className={ className } onClick={ props.goto.bind(null, props.preline.concat([ props.move ]) )}>
+    { props.move }
+  </div>
+}
+
+function MoveColumn (props) {
+  if (props.moves.length === 0) return<React.Fragment />
+  const items = props.moves.map((move, key) => <MoveItem
+  move={ move }
+  key={ key }
+  active={ move === props.active }
+  preline={ props.preline }
+  goto={ props.goto }
+  />)
+  return <div className="flex flex-col px-4">
+    {items}
+  </div>
+}
 
 export default class OpeningNavigator extends React.Component {
   
   constructor(props) {
     super(props)
+
+    this.walker = new RepertoireWalker(repertoire)
+
     this.state = {
       line: []
     }
+  }
+  
+  componentDidMount () {
+    this.goto([ 'e4', 'e5', 'e6', 'e7' ])
+    // TODO: enlever l'event listener à l'unmount
     document.body.addEventListener('keydown', this.onKeyDown.bind(this))
   }
 
-  preline () {
-    return this.state.line.slice(0, -1)
-  }
-
-  currentMove () {
-    return this.state.line[this.state.line.length - 1]
-  }
-
-  /**
-   * 
-   * @param {KeyboardEvent} event 
-   */
-  onKeyDown (event) {
-    if (event.key === 'ArrowLeft') {
-      this.setState(state => {
-        return {
-          line: state.line.slice(0, -1)
-        }
-      })
-    } else if (event.key === 'ArrowRight') {
-      const { value: nextMove } = this.nextMoves(this.state.line).next()
-      if (nextMove) {
-        this.setState(state => {
-          return {
-            line: state.line.concat([ nextMove ])
-          }
-        })
-      }
-    } else if (event.key === 'ArrowDown') {
-      const it = this.nextMoves(this.preline())
-      while (true) {
-        const { value } = it.next()
-        if (value === undefined) break
-        if (value === this.currentMove()) {
-          const { value } = it.next()
-          if (value !== undefined) {
-            this.setState(state => {
-              return {
-                line: state.line.slice(0, -1).concat([ value ])
-              }
-            })
-          }
-          break
-        }
-      }
-    } else if (event.key === 'ArrowUp') {
-      const it = this.nextMoves(this.preline())
-      let previousValue = undefined
-      while (true) {
-        const { value } = it.next()
-        if (value === this.currentMove()) break
-        if (value === undefined) break
-        previousValue = value
-      }
-      if (previousValue !== undefined) {
-        this.setState(state => {
-          return {
-            line: state.line.slice(0, -1).concat([ previousValue ])
-          }
-        })
-      }
-    }
-  }
-
-  goto (line) {
+  setLine (line) {
     this.setState(state => {
       return {
         line
@@ -83,55 +52,53 @@ export default class OpeningNavigator extends React.Component {
     })
   }
 
-  nextMoves (line) {
-    return repertoire.at(line).children.keys()
+  /**
+   * @param {KeyboardEvent} event 
+   */
+  onKeyDown (event) {
+    switch (event.key) {
+      case 'ArrowLeft':
+        this.walker.moveLeft()
+        break
+      case 'ArrowRight':
+        this.walker.moveRight()
+        break
+      case 'ArrowDown':
+        this.walker.moveDown()
+        break
+      case 'ArrowUp':
+        this.walker.moveUp()
+        break
+    }
+    this.setLine(this.walker.line)
+  }
+
+  goto (line) {
+    this.walker.goto(line)
+    this.setLine(line)
   }
 
   render () {
-    const breadcrumb = []
-    for (const [key, move] of this.state.line.slice(0, -1).entries()) {
-      const line = this.state.line.slice(0, key + 1)
-      breadcrumb.push(
-        <div className="px-4 font-bold cursor-pointer" key={ key } onClick={ this.goto.bind(this, line) }>
-          {move}
-        </div>
-      )
-    }
+    const tail = this.walker.preline().map((move, key) => {
+      return <MoveColumn moves={ [ move ] }
+        active={ move }
+        preline={ this.walker.line.slice(0, key) }
+        goto={ this.goto.bind(this) }
+        key={ key } />
+    })
 
-    const current = []
-    for (const [key, move] of Array.from(this.nextMoves(this.state.line.slice(0, -1))).entries()) {
-      const line = this.state.line.concat([ move ])
-      const classList = [ "mb-4", "cursor-pointer" ]
-      if (move === this.state.line[this.state.line.length - 1]) {
-        classList.push('font-bold')
-      }
-      current.push(
-        <div className={ classList.join(' ') } key={ key } onClick={ this.goto.bind(this, line) }>
-          {move}
-        </div>
-      )
-    }
-
-    const next = []
-    if (this.state.line.length !== 0) {
-      for (const [key, move] of Array.from(this.nextMoves(this.state.line)).entries()) {
-        const line = this.state.line.concat([ move ])
-        next.push(
-          <div className="mb-4 cursor-pointer" key={ key } onClick={ this.goto.bind(this, line) }>
-            {move}
-          </div>
-        )
-      }
-    }
+    const alternatives = this.walker.line.length === 0 ? [] : Array.from(
+      this.walker.suggestions(this.walker.preline())
+    )
+    
+    const suggestions = Array.from(
+      this.walker.suggestions(this.walker.line)
+    )
 
     return <div className="flex">
-      {breadcrumb}
-      <div className="flex flex-col px-4">
-        {current}
-      </div>
-      <div className="flex flex-col px-4">
-        {next}
-      </div>
+      { tail }
+      <MoveColumn moves={ alternatives } active={ this.walker.current() } preline={ this.walker.preline() } goto={ this.goto.bind(this) } />
+      <MoveColumn moves={ suggestions } preline={ this.walker.line } goto={ this.goto.bind(this) } />
     </div>
   }
 
