@@ -1,6 +1,4 @@
 import React from 'react'
-import { RepertoireWalker } from '../../lib/RepertoireWalker.js'
-import repertoire from '../repertoire.js'
 
 function MoveItem (props) {
   let className = "mb-4 cursor-pointer"
@@ -31,17 +29,22 @@ export default class OpeningNavigator extends React.Component {
   constructor(props) {
     super(props)
 
-    this.walker = new RepertoireWalker(repertoire)
+    const line = props.line
 
     this.state = {
-      line: []
+      line
     }
   }
   
   componentDidMount () {
-    this.goto([ 'e4', 'e5', 'e6', 'e7' ])
     // TODO: enlever l'event listener à l'unmount
     document.body.addEventListener('keydown', this.onKeyDown.bind(this))
+  }
+
+  componentDidUpdate (previousProps) {
+    if (previousProps.line !== this.props.line) {
+      this.setLine(this.props.line)
+    }
   }
 
   setLine (line) {
@@ -58,47 +61,47 @@ export default class OpeningNavigator extends React.Component {
   onKeyDown (event) {
     switch (event.key) {
       case 'ArrowLeft':
-        this.walker.moveLeft()
+        this.props.walker.moveLeft()
         break
       case 'ArrowRight':
-        this.walker.moveRight()
+        this.props.walker.moveRight()
         break
       case 'ArrowDown':
-        this.walker.moveDown()
+        this.props.walker.moveDown()
         break
       case 'ArrowUp':
-        this.walker.moveUp()
+        this.props.walker.moveUp()
         break
     }
-    this.setLine(this.walker.line)
+    this.setLine(this.props.walker.line)
   }
 
   goto (line) {
-    this.walker.goto(line)
+    this.props.walker.setLine(line)
     this.setLine(line)
   }
 
   render () {
-    const tail = this.walker.preline().map((move, key) => {
+    const tail = this.props.walker.preline().map((move, key) => {
       return <MoveColumn moves={ [ move ] }
         active={ move }
-        preline={ this.walker.line.slice(0, key) }
+        preline={ this.props.walker.line.slice(0, key) }
         goto={ this.goto.bind(this) }
         key={ key } />
     })
 
-    const alternatives = this.walker.line.length === 0 ? [] : Array.from(
-      this.walker.suggestions(this.walker.preline())
+    const alternatives = Array.from(
+      this.props.walker.alternatives(this.props.walker.line)
     )
-    
+
     const suggestions = Array.from(
-      this.walker.suggestions(this.walker.line)
+      this.props.walker.suggestions(this.props.walker.line)
     )
 
     return <div className="flex">
       { tail }
-      <MoveColumn moves={ alternatives } active={ this.walker.current() } preline={ this.walker.preline() } goto={ this.goto.bind(this) } />
-      <MoveColumn moves={ suggestions } preline={ this.walker.line } goto={ this.goto.bind(this) } />
+      <MoveColumn moves={ alternatives } active={ this.props.walker.current() } preline={ this.props.walker.preline() } goto={ this.goto.bind(this) } />
+      <MoveColumn moves={ suggestions } preline={ this.props.walker.line } goto={ this.goto.bind(this) } />
     </div>
   }
 
