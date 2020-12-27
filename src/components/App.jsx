@@ -1,121 +1,51 @@
-import React from 'react'
-import ReactDOM from 'react-dom'
-import OpeningNavigator from './OpeningNavigator.jsx'
-import Chessground from 'react-chessground'
+import React, { useCallback, useEffect, useState } from 'react'
+import { Chessground } from './Chessground.jsx'
+import { RepertoireNavigator } from './RepertoireNavigator.jsx'
 import Chess from 'chess.js'
-import 'react-chessground/dist/styles/chessground.css'
-import './app.pcss'
-import repertoire from '../repertoire.js'
 import { RepertoireWalker } from '../../lib/RepertoireWalker.js'
+import repertoire from '../repertoire.js'
 
-class App extends React.Component {
+export function App () {
+  const [ chess, _ ] = useState(new Chess())
+  const [ line, setLine ] = useState([])
 
-  constructor (props) {
-    super(props)
+  const onMove = useCallback(() => {
+    setLine(chess.history())
+  })
 
-    this.chess = new Chess()
-    this.walker = new RepertoireWalker(repertoire)
-    this.walker.addEventListener('change', this.walkerChange.bind(this))
-
-    this.state = {
-      fen: this.chess.fen(),
-      history: [],
-      turnColor: 'white',
-      check: false,
-      lastMove: undefined
+  useEffect(() => {
+    function onKeyDown (e) {
+      if (e.key.startsWith('Arrow')) {
+        const direction = e.key.replace('Arrow', '').toLowerCase()
+        const walker = new RepertoireWalker(repertoire, chess.history())
+        walker.move(direction)
+        setLine(walker.line)
+        chess.reset()
+        for (const san of walker.line) {
+          chess.move(san)
+        }
+        onMove()
+      }
     }
-  }
 
-  setFen (fen) {
-    this.setState(state => {
-      return {
-        ...state,
-        fen
-      }
-    })
-  }
+    document.body.addEventListener('keydown', onKeyDown)
 
-  setHistory (history) {
-    this.setState(state => {
-      return {
-        ...state,
-        history
-      }
-    })
-  }
-
-  setCheck (check) {
-    this.setState(state => {
-      return {
-        ...state,
-        check
-      }
-    })
-  }
-
-  setTurnColor (turnColor) {
-    this.setState(state => {
-      return {
-        ...state,
-        turnColor
-      }
-    })
-  }
-
-  setLastMove (lastMove) {
-    this.setState(state => {
-      return {
-        ...state,
-        lastMove
-      }
-    })
-  }
-
-  walkerChange () {
-    this.chess.reset()
-    for (const san of this.walker.line) {
-      this.chess.move(san)
+    // clear
+    return () => {
+      document.body.removeEventListener('keydown', onKeyDown)
     }
-    this.refreshState()
-  }
+  }, [])
 
-  refreshState () {
-    this.setFen(this.chess.fen())
-    this.setHistory(this.chess.history())
-    this.setCheck(this.chess.in_check())
-    this.setTurnColor(this.chess.turn() === 'w' ? 'white' : 'black')
-  }
-  
-  onMove (from, to) {
-    const result = this.chess.move({ from, to })
-    if (result !== null) {
-      this.setLastMove([ from, to ])
-      this.walker.setLine(this.chess.history())
-      this.refreshState()
-    }
-  }
-
-  render () {
-    return <React.Fragment>
-      <h1>Chessop</h1>
+  return <div className="container mx-auto py-8">
+    <div className="grid grid-cols-2">
       <div className="flex">
-        <Chessground
-          width="26vw"
-          height="26vw"
-          onMove={ this.onMove.bind(this) }
-          fen={this.state.fen}
-          check={ this.state.check }
-          turnColor={ this.state.turnColor }
-          lastMove={ this.state.lastMove }
-        />
-        <OpeningNavigator walker={ this.walker } line={ this.state.history } />
+        <div className="mx-auto">
+          <Chessground chess={ chess } onMove={ onMove } />
+        </div>
       </div>
-    </React.Fragment>
-  }
-
+      <div>
+        <RepertoireNavigator repertoire={ repertoire } line={ line } />
+      </div>
+    </div>
+  </div>
 }
-
-ReactDOM.render(
-  <App />,
-  document.getElementById('app')
-)
