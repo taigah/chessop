@@ -18,6 +18,7 @@ module.exports = {
   ],
   devServer: {
     contentBase: './dist',
+    host: 'chessop.localhost'
   },
   module: {
     rules: [

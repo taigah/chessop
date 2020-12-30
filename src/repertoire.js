@@ -2,14 +2,10 @@ import { OpeningRepertoire } from 'corf'
 
 const repertoire = new OpeningRepertoire()
 
-repertoire.add({
-  line: ['e4', 'e5', 'Nf3', 'Nc6'],
-  meta: {}
-})
+const tree = localStorage.getItem('repertoire')
 
-repertoire.add({
-  line: ['e4', 'd5', 'exd5', 'Qxd5'],
-  meta: {}
-})
+if (tree) {
+  repertoire.tree = OpeningRepertoire.fromJSON(tree).tree
+}
 
 export default repertoire
