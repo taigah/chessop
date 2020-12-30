@@ -66,6 +66,16 @@ export function App () {
     localStorage.setItem('repertoire', value)
   })
 
+  const removeLine = useCallback(e => {
+    const base = repertoire.at(line)
+    if (base === null) return
+    const parent = repertoire.at(line.slice(0, -1))
+    if (parent === null) throw new Error('Cannot remove root')
+    parent.children.delete(line.slice(-1)[0])
+    setComments('')
+    localStorage.setItem('repertoire', repertoire.toJSON())
+  })
+
   return <div className="container mx-auto py-8">
     <div className="grid grid-cols-2">
       <div className="flex flex-col">
@@ -81,7 +91,12 @@ export function App () {
           <RepertoireNavigator repertoire={ repertoire } line={ line } />
         </div>
         <div className="border border-black p-2">
-          <Comments comments={ comments } onChange={ onCommentChange }></Comments>
+          <div className="mb-4">
+            <Comments comments={ comments } onChange={ onCommentChange }></Comments>
+          </div>
+          <div>
+            <button className="bg-red-700 text-white px-4 py-2 rounded hover:bg-red-500" onClick={ removeLine }>Supprimer la variante</button>
+          </div>
         </div>
       </div>
     </div>
