@@ -21,6 +21,7 @@ export function App () {
   const [ chess, chessDispatch ] = useReducer(chessReducer, new Chess())
   const [ shapes, setShapes ] = useState([])
   const [ orientation, setOrientation ] = useState('white')
+  const [ repertoireColor, setRepertoireColor ] = useState('white')
 
   const fen = useMemo(() => {
     return chess.fen()
@@ -79,7 +80,6 @@ export function App () {
         const delta = event.key === 'ArrowUp' ? 1 : -1
         const nextAlternativeIndex = (alternatives.length + currentMoveIndex + delta) % alternatives.length
         const nextAlternative = alternatives[nextAlternativeIndex]
-        debugger
         chessDispatch(chess => {
           chess.undo()
           chess.move(nextAlternative)
@@ -112,11 +112,39 @@ export function App () {
   const onCommentsChange = useCallback(event => {
     const comments = event.target.value
     repertoireDispatch(() => {
-      repertoire.at(chess.history()).node.meta.comments = comments
+      const node = repertoire.at(chess.history())?.node
+      if (node) {
+        node.meta.comments = comments
+      } else {
+        repertoire.add({
+          line: chess.history(),
+          meta: {
+            comments
+          }
+        })
+      }
+    })
+  })
+
+  const deleteMove = useCallback(event => {
+    repertoireDispatch(repertoire => {
+      const history = chess.history()
+      if (history.length === 0) return alert('Vous ne pouvez pas supprimer la position de départ')
+      if (!confirm('Êtes-vous sûr de vouloir supprimer ce coup et ses coups qui en découlent ?')) return
+      const lastMove = history[history.length - 1]
+      repertoire.at(history.slice(0, -1)).children.delete(lastMove)
     })
   })
   
   return <div className="flex justify-center pt-8">
+    <div className="mr-4 flex flex-col">
+      <button
+        className={ repertoireColor === 'white' ? "mb-2 px-2 bg-blue-500 text-white rounded" : "mb-2 px-2 rounded" }
+        onClick={ setRepertoireColor.bind(this, 'white') }>Répertoire blanc</button>
+      <button
+        className={ repertoireColor === 'black' ? "px-2 bg-blue-500 text-white rounded" : "px-2 rounded" }
+        onClick={ setRepertoireColor.bind(this, 'black') }>Répertoire noir</button>
+    </div>
     <div>
       <div className="flex">
         <Chessground
@@ -139,6 +167,8 @@ export function App () {
     </div>
     <div>
       <textarea value={ meta.comments ?? '' } onChange={ onCommentsChange }></textarea>
+
+      <button className="px-2 border bg-red-500 text-white rounded" title="Supprimer le coup du répertoire" onClick={ deleteMove }>x</button>
     </div>
   </div>
 }
