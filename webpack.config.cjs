@@ -29,7 +29,7 @@ module.exports = {
           loader: 'babel-loader',
           options: {
             presets: ['@babel/preset-react'],
-            plugins: ['@babel/plugin-syntax-jsx']
+            plugins: ['@babel/plugin-syntax-jsx', '@babel/plugin-proposal-class-properties']
           }
         }
       },
