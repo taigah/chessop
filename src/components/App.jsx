@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useReducer, useState } from 're
 import { Chessground } from './Chessground.jsx'
 import 'react-chessground/dist/styles/chessground.css'
 import Chess from 'chess.js'
+import { repertoire as localRepertoire } from '../repertoire.js'
 
 const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -10,9 +11,16 @@ function chessReducer (chess, action) {
   return Object.assign({}, chess)
 }
 
+function repertoireReducer (repertoire, action) {
+  action(repertoire)
+  return Object.create(repertoire)
+}
+
 export function App () {
+  const [ repertoire, repertoireDispatch ] = useReducer(repertoireReducer, localRepertoire)
   const [ chess, chessDispatch ] = useReducer(chessReducer, new Chess())
   const [ shapes, setShapes ] = useState([])
+  const [ orientation, setOrientation ] = useState('white')
 
   const fen = useMemo(() => {
     return chess.fen()
@@ -47,10 +55,35 @@ export function App () {
     }
   }, [ chess ])
 
+  const meta = useMemo(() => {
+    return repertoire.at(chess.history())?.node?.meta ?? {}
+  }, [ chess, repertoire ])
+
   useEffect(() => {
     function onKeyDown (event) {
       if (event.key === 'ArrowLeft') {
         chessDispatch(chess => chess.undo())
+      } else if (event.key === 'ArrowRight') {
+        const currentNode = repertoire.at(chess.history())
+        const nextMove = Array.from(currentNode.children.keys())[0]
+        if (nextMove) {
+          chessDispatch(chess => chess.move(nextMove))
+        }
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        const history = chess.history()
+        if (history.length === 0) return
+        const previousNode = repertoire.at(history.slice(0, -1))
+        const currentMove = history[history.length - 1]
+        const alternatives = Array.from(previousNode.children.keys())
+        const currentMoveIndex = alternatives.indexOf(currentMove)
+        const delta = event.key === 'ArrowUp' ? 1 : -1
+        const nextAlternativeIndex = (alternatives.length + currentMoveIndex + delta) % alternatives.length
+        const nextAlternative = alternatives[nextAlternativeIndex]
+        debugger
+        chessDispatch(chess => {
+          chess.undo()
+          chess.move(nextAlternative)
+        })
       }
     }
 
@@ -60,6 +93,10 @@ export function App () {
     }
   }, [])
 
+  useEffect(() => {
+    localStorage.setItem('repertoire', repertoire.toJSON())
+  }, [ repertoire ])
+
   const onMove = useCallback((from, to)=> {
     chessDispatch(chess => chess.move({ from, to }))
   })
@@ -68,27 +105,40 @@ export function App () {
     setShapes([ ...shapes ])
   })
 
-  const onClick = useCallback(event => {
-    chessDispatch(chess => {
-      chess.reset()
-      chess.move('e4')
-      chess.move('e5')
-      chess.move('Nf3')
-      chess.move('Nc6')
+  const toggleOrientation = useCallback(event => {
+    setOrientation(orientation === 'white' ? 'black' : 'white')
+  })
+
+  const onCommentsChange = useCallback(event => {
+    const comments = event.target.value
+    repertoireDispatch(() => {
+      repertoire.at(chess.history()).node.meta.comments = comments
     })
   })
   
   return <div className="flex justify-center pt-8">
-    <Chessground
-      fen={ fen }
-      lastMove={ lastMove }
-      turnColor={ turnColor }
-      check={ check }
-      movable={ movable }
-      shapes={ shapes }
-      onMove={ onMove }
-      onDrawableChange={ onDrawableChange }
-       />
-    <button onClick={ onClick }>click</button>
+    <div>
+      <div className="flex">
+        <Chessground
+          fen={ fen }
+          lastMove={ lastMove }
+          turnColor={ turnColor }
+          check={ check }
+          movable={ movable }
+          shapes={ shapes }
+          orientation={ orientation }
+          onMove={ onMove }
+          onDrawableChange={ onDrawableChange }
+          />
+        <div className="mx-4">
+          <button
+            className="px-2 border bg-blue-500 text-white rounded"
+            onClick={ toggleOrientation }>Orientation</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <textarea value={ meta.comments ?? '' } onChange={ onCommentsChange }></textarea>
+    </div>
   </div>
 }
