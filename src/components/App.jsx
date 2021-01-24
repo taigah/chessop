@@ -2,13 +2,23 @@ import React, { useCallback, useEffect, useMemo, useReducer, useState } from 're
 import { Chessground } from './Chessground.jsx'
 import 'react-chessground/dist/styles/chessground.css'
 import Chess from 'chess.js'
-import { repertoire as localRepertoire } from '../repertoire.js'
-
-const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+import { OpeningRepertoire } from 'corf'
 
 function chessReducer (chess, action) {
   action(chess)
   return Object.assign({}, chess)
+}
+
+function loadRepertoire (name) {
+  const tree = localStorage.getItem('repertoire_' + name)
+  if (tree === null) {
+    return new OpeningRepertoire()
+  }
+  return OpeningRepertoire.fromJSON(tree)
+}
+
+function saveRepertoire (name, repertoire) {
+  localStorage.setItem('repertoire_' + name, repertoire.toJSON())
 }
 
 function repertoireReducer (repertoire, action) {
@@ -16,8 +26,11 @@ function repertoireReducer (repertoire, action) {
   return Object.create(repertoire)
 }
 
+const whiteRepertoire = loadRepertoire('white')
+
 export function App () {
-  const [ repertoire, repertoireDispatch ] = useReducer(repertoireReducer, localRepertoire)
+  const [ repertoireName, setRepertoireName ] = useState('white')
+  const [ repertoire, repertoireDispatch ] = useReducer(repertoireReducer, whiteRepertoire)
   const [ chess, chessDispatch ] = useReducer(chessReducer, new Chess())
   const [ shapes, setShapes ] = useState([])
   const [ orientation, setOrientation ] = useState('white')
@@ -60,41 +73,47 @@ export function App () {
     return repertoire.at(chess.history())?.node?.meta ?? {}
   }, [ chess, repertoire ])
 
-  useEffect(() => {
-    function onKeyDown (event) {
-      if (event.key === 'ArrowLeft') {
-        chessDispatch(chess => chess.undo())
-      } else if (event.key === 'ArrowRight') {
-        const currentNode = repertoire.at(chess.history())
-        const nextMove = Array.from(currentNode.children.keys())[0]
-        if (nextMove) {
-          chessDispatch(chess => chess.move(nextMove))
-        }
-      } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-        const history = chess.history()
-        if (history.length === 0) return
-        const previousNode = repertoire.at(history.slice(0, -1))
-        const currentMove = history[history.length - 1]
-        const alternatives = Array.from(previousNode.children.keys())
-        const currentMoveIndex = alternatives.indexOf(currentMove)
-        const delta = event.key === 'ArrowUp' ? 1 : -1
-        const nextAlternativeIndex = (alternatives.length + currentMoveIndex + delta) % alternatives.length
-        const nextAlternative = alternatives[nextAlternativeIndex]
-        chessDispatch(chess => {
-          chess.undo()
-          chess.move(nextAlternative)
-        })
+  const onKeyDown = useCallback((event) => {
+    if (event.key === 'ArrowLeft') {
+      chessDispatch(chess => chess.undo())
+    } else if (event.key === 'ArrowRight') {
+      const currentNode = repertoire.at(chess.history())
+      const nextMove = Array.from(currentNode.children.keys())[0]
+      if (nextMove) {
+        chessDispatch(chess => chess.move(nextMove))
       }
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      const history = chess.history()
+      if (history.length === 0) return
+      const previousNode = repertoire.at(history.slice(0, -1))
+      const currentMove = history[history.length - 1]
+      const alternatives = Array.from(previousNode.children.keys())
+      const currentMoveIndex = alternatives.indexOf(currentMove)
+      const delta = event.key === 'ArrowUp' ? 1 : -1
+      const nextAlternativeIndex = (alternatives.length + currentMoveIndex + delta) % alternatives.length
+      const nextAlternative = alternatives[nextAlternativeIndex]
+      chessDispatch(chess => {
+        chess.undo()
+        chess.move(nextAlternative)
+      })
     }
-
+  }, [ repertoire ])
+  
+  useEffect(() => {
     document.body.addEventListener('keydown', onKeyDown)
     return () => {
       document.body.removeEventListener('keydown', onKeyDown)
     }
-  }, [])
+  }, [ onKeyDown ])
 
   useEffect(() => {
-    localStorage.setItem('repertoire', repertoire.toJSON())
+    repertoireDispatch(repertoire => {
+      repertoire.tree = loadRepertoire(repertoireName).tree
+    })
+  }, [ repertoireName ])
+
+  useEffect(() => {
+    saveRepertoire(repertoireName, repertoire)
   }, [ repertoire ])
 
   const onMove = useCallback((from, to)=> {
@@ -139,11 +158,11 @@ export function App () {
   return <div className="flex justify-center pt-8">
     <div className="mr-4 flex flex-col">
       <button
-        className={ repertoireColor === 'white' ? "mb-2 px-2 bg-blue-500 text-white rounded" : "mb-2 px-2 rounded" }
-        onClick={ setRepertoireColor.bind(this, 'white') }>Répertoire blanc</button>
+        className={ repertoireName === 'white' ? "mb-2 px-2 bg-blue-500 text-white rounded" : "mb-2 px-2 rounded" }
+        onClick={ setRepertoireName.bind(this, 'white') }>Répertoire blanc</button>
       <button
-        className={ repertoireColor === 'black' ? "px-2 bg-blue-500 text-white rounded" : "px-2 rounded" }
-        onClick={ setRepertoireColor.bind(this, 'black') }>Répertoire noir</button>
+        className={ repertoireName === 'black' ? "px-2 bg-blue-500 text-white rounded" : "px-2 rounded" }
+        onClick={ setRepertoireName.bind(this, 'black') }>Répertoire noir</button>
     </div>
     <div>
       <div className="flex">
